@@ -6,16 +6,19 @@ import os
 import hashlib
 import telebot
 import flask
+from flask_sslify import SSLify  # Для принудительного HTTPS
+import os
 
 # Конфигурация
-API_TOKEN = ''  # Укажите ваш токен бота
-APP_HOST = '127.0.0.1'
-APP_PORT = 8444  # Порт должен быть числом, а не строкой
-WEB_HOOK_URL = 'https://your-ngrok-url.ngrok-free.app'  # Укажите ваш URL для вебхука
+API_TOKEN = os.getenv('BOT_TOKEN')
+APP_HOST = '0.0.0.0'  # Слушаем все интерфейсы
+APP_PORT = 8444
+WEB_HOOK_URL = os.getenv('WEBHOOK_HOST')  # Замените на ваш публичный IP или домен
 
 # Инициализация бота и Flask-приложения
 bot = telebot.TeleBot(API_TOKEN)
 app = flask.Flask(__name__)
+sslify = SSLify(app)  # Принудительный HTTPS
 
 # Проверка и создание директории для изображений
 if not os.path.exists('content'):
@@ -101,7 +104,6 @@ def predict_image(message):
 
 
 # Обработчик изображений
-# Обработчик изображений
 @bot.message_handler(content_types=['photo'])
 def handle_image(message):
     try:
@@ -146,6 +148,7 @@ def handle_image(message):
     except Exception as e:
         bot.send_message(chat_id, f"Ошибка при обработке изображения: {str(e)}")
 
+
 # Обработчик команды /logout
 @bot.message_handler(commands=['logout'])
 def logout_user(message):
@@ -186,5 +189,10 @@ def webhook():
 if __name__ == '__main__':
     bot.remove_webhook()
     time.sleep(1)
-    bot.set_webhook(url=WEB_HOOK_URL)
-    app.run(host=APP_HOST, port=APP_PORT, debug=True)
+    bot.set_webhook(url=WEB_HOOK_URL, certificate=open(os.getenv('FULLCHAIN_PATH'), 'r'))
+    app.run(
+        host=APP_HOST,
+        port=APP_PORT,
+        ssl_context=(os.getenv('FULLCHAIN_PATH'), os.getenv('PRIVKEY_PATH')),
+        debug=True
+    )
